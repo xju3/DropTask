@@ -152,9 +152,9 @@ struct TaskEditorView: View {
             task.status = status
             task.plannedCompletionTime = plannedCompletionTime
             
-            // 更新系统日历
+            // 更新系统提醒事项
             Task {
-                await CalendarSyncManager.shared.saveEvent(for: task)
+                await ReminderSyncManager.shared.saveReminder(for: task)
             }
         } else {
             // 创建新任务
@@ -168,17 +168,17 @@ struct TaskEditorView: View {
             )
             modelContext.insert(newTask)
             
-            // 同步到系统日历
+            // 同步到系统提醒事项
             Task {
-                await CalendarSyncManager.shared.saveEvent(for: newTask)
+                await ReminderSyncManager.shared.saveReminder(for: newTask)
             }
         }
     }
     
     private func deleteTask() {
         if let editingTaskId = editingTaskId, let task = allTasks.first(where: { $0.taskId == editingTaskId }) {
-            // 从系统日历中删除
-            CalendarSyncManager.shared.deleteEvent(identifier: task.eventIdentifier)
+            // 从系统提醒事项中删除
+            ReminderSyncManager.shared.deleteReminder(identifier: task.eventIdentifier)
             modelContext.delete(task)
         }
         dismiss()

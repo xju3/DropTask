@@ -16,8 +16,8 @@ struct CreateTaskIntent: AppIntent {
     var content: String
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        // 获取全局共享数据库配置
-        let container = TaskDatabase.sharedContainer
+        // 安全地从主线程获取全局共享数据库配置
+        let container = await MainActor.run { TaskDatabase.sharedContainer }
         
         // AppIntent 在后台运行，必须创建独立的后台数据上下文，避免与 UI 抢占主线程导致死锁
         let context = ModelContext(container)
@@ -33,12 +33,13 @@ struct CreateTaskIntent: AppIntent {
         // 1. 存入 SwiftData
         context.insert(newTask)
         
-        // 使用值传递进行日历同步，避免跨线程传递 SwiftData 模型 (newTask) 导致的崩溃
-        let newEventId = await CalendarSyncManager.shared.saveEvent(
+        // 使用值传递进行提醒事项同步，避免跨线程传递 SwiftData 模型 (newTask) 导致的崩溃
+        let newEventId = await ReminderSyncManager.shared.saveReminder(
             title: newTask.title,
             notes: newTask.content,
-            startDate: newTask.startTime,
-            endDate: newTask.plannedCompletionTime,
+            dueDate: newTask.plannedCompletionTime,
+            priority: newTask.priority,
+            status: newTask.status,
             identifier: newTask.eventIdentifier
         )
         
@@ -48,7 +49,7 @@ struct CreateTaskIntent: AppIntent {
             if newEventId != nil {
                 return .result(dialog: IntentDialog("好的，已为您在 DropTask 中创建：\(taskTitle)"))
             } else {
-                return .result(dialog: IntentDialog("好的，已为您在 DropTask 中创建：\(taskTitle)。日历同步暂未完成，稍后请在应用内允许日历权限。"))
+                return .result(dialog: IntentDialog("好的，已为您在 DropTask 中创建：\(taskTitle)。提醒事项同步暂未完成，稍后请在应用内允许权限。"))
             }
         } catch {
             return .result(dialog: IntentDialog("抱歉，保存任务时出错了。"))

@@ -2,23 +2,7 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleIdentifier</key>
-	<string>com.pdi.DropTask</string>
-	<key>CFBundleName</key>
-	<string>DropTask</string>
-	<key>CFBundleDisplayName</key>
-	<string>DropTask</string>
-	<key>LSApplicationCategoryType</key>
-	<string>public.app-category.productivity</string>
 	<key>CFBundleIconFile</key>
 	<string>DropTask</string>
-	<key>NSSiriUsageDescription</key>
-	<string>允许 Siri 帮您在速记中快速创建任务。</string>
-	<key>NSCalendarsFullAccessUsageDescription</key>
-	<string>我们需要访问您的日历，以便将任务自动同步为日历日程。</string>
-	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
-	<string>我们需要访问您的日历，以便将任务自动同步为日历日程。</string>
-	<key>NSCalendarsUsageDescription</key>
-	<string>我们需要访问您的日历，以便将任务自动同步为日历日程。</string>
 </dict>
 </plist>

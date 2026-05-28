@@ -8,6 +8,7 @@
 import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
+import ServiceManagement
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
@@ -23,6 +24,10 @@ struct ContentView: View {
     // 增加过滤状态变量。默认状态选"未完成"以保持您之前的体验（也可手动选"全部"不过滤）
     @State private var selectedStatusFilter: String = "未完成"
     @State private var selectedCategoryFilter: String = "全部"
+    
+    // 新增：搜索文本和自启动状态
+    @State private var searchText: String = ""
+    @State private var isLaunchAtLoginEnabled: Bool = SMAppService.mainApp.status == .enabled
 
     // 1. 使用 @Query 获取按时间排序的所有任务
     @Query(sort: \TaskItem.plannedCompletionTime, order: .forward) private var allTasks: [TaskItem]
@@ -43,7 +48,10 @@ struct ContentView: View {
             // 分类过滤逻辑：全部，或者是具体匹配的分类
             let categoryMatch = selectedCategoryFilter == "全部" || task.category == selectedCategoryFilter
             
-            return statusMatch && categoryMatch
+            // 搜索过滤逻辑：标题或内容包含搜索词
+            let searchMatch = searchText.isEmpty || task.title.localizedCaseInsensitiveContains(searchText) || task.content.localizedCaseInsensitiveContains(searchText)
+            
+            return statusMatch && categoryMatch && searchMatch
         }
     }
     
@@ -61,25 +69,44 @@ struct ContentView: View {
     var body: some View {
         VStack(spacing: 0) {
             // --- 顶部过滤工具栏 ---
-            HStack {
-                Picker("状态", selection: $selectedStatusFilter) {
-                    Text("所有状态").tag("全部")
-                    Text("未完成").tag("未完成") // 增加未完成选项，方便快速屏蔽已完成任务
-                    Divider()
-                    ForEach(TaskStatus.allCases, id: \.self) { status in
-                        Text(status.rawValue).tag(status.rawValue)
+            VStack(spacing: 8) {
+                HStack {
+                    Picker("状态", selection: $selectedStatusFilter) {
+                        Text("所有状态").tag("全部")
+                        Text("未完成").tag("未完成") 
+                        Divider()
+                        ForEach(TaskStatus.allCases, id: \.self) { status in
+                            Text(status.rawValue).tag(status.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    
+                    Spacer()
+                    
+                    Picker("分类", selection: $selectedCategoryFilter) {
+                        ForEach(availableCategories, id: \.self) { cat in
+                            Text(cat == "全部" ? "所有分类" : cat).tag(cat)
+                        }
+                    }
+                    .labelsHidden()
+                }
+                
+                // 搜索框
+                HStack {
+                    Image(systemName: "magnifyingglass").foregroundColor(.secondary)
+                    TextField("搜索任务...", text: $searchText)
+                        .textFieldStyle(.plain)
+                    if !searchText.isEmpty {
+                        Button { searchText = "" } label: {
+                            Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .labelsHidden()
-                
-                Spacer()
-                
-                Picker("分类", selection: $selectedCategoryFilter) {
-                    ForEach(availableCategories, id: \.self) { cat in
-                        Text(cat == "全部" ? "所有分类" : cat).tag(cat)
-                    }
-                }
-                .labelsHidden()
+                .padding(6)
+                .background(Color(NSColor.controlBackgroundColor))
+                .cornerRadius(6)
+                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.secondary.opacity(0.2), lineWidth: 1))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
@@ -104,6 +131,10 @@ struct ContentView: View {
                                         .modifiers(.control)
                                         .onEnded {
                                             task.status = .completed
+                                            
+                                            Task {
+                                                await ReminderSyncManager.shared.saveReminder(for: task)
+                                            }
                                         }
                                 )
                                 // 普通单击事件：打开编辑窗口
@@ -148,14 +179,54 @@ struct ContentView: View {
                 
                 Spacer()
                 
-                Button("退出应用") {
-                    NSApplication.shared.terminate(nil)
+                // 设置菜单：包含自启动和退出
+                Menu {
+                    Toggle("开机自启", isOn: Binding(
+                        get: { isLaunchAtLoginEnabled },
+                        set: { newValue in
+                            isLaunchAtLoginEnabled = newValue
+                            toggleLaunchAtLogin(enabled: newValue)
+                        }
+                    ))
+                    Divider()
+                    Button("退出应用", role: .destructive) {
+                        NSApplication.shared.terminate(nil)
+                    }
+                } label: {
+                    Image(systemName: "gearshape")
                 }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
             }
             .padding()
         }
         // 宽度固定，高度不再做全局限制，让内部 ScrollView 根据设定的条数精准撑开
         .frame(width: 350)
+        // 实现拖拽创建任务：支持将选中的文本直接拖入应用面板
+        .onDrop(of: [.plainText], isTargeted: nil) { providers in
+            for provider in providers {
+                _ = provider.loadObject(ofClass: String.self) { text, _ in
+                    if let text = text {
+                        DispatchQueue.main.async {
+                            let title = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !title.isEmpty else { return }
+                            let newTask = TaskItem(
+                                title: title, content: "", priority: .medium,
+                                status: .notStarted, plannedCompletionTime: Date().addingTimeInterval(3600)
+                            )
+                            modelContext.insert(newTask)
+                            Task { await ReminderSyncManager.shared.saveReminder(for: newTask) }
+                        }
+                    }
+                }
+            }
+            return true
+        }
+        .onAppear {
+            // 每次打开菜单栏弹窗时，注册监听并主动同步一次系统提醒事项的最新状态
+            ReminderSyncManager.shared.startObserving(context: modelContext)
+            ReminderSyncManager.shared.syncRemindersToTasks(context: modelContext)
+        }
         .fileExporter(
             isPresented: $isExporting,
             document: exportDocument,
@@ -198,6 +269,17 @@ struct ContentView: View {
         // 2. 通过 SwiftUI 的 fileExporter 唤起系统保存文件面板
         exportDocument = TaskExportDocument(text: markdownString)
         isExporting = true
+    }
+    
+    // 开机自启动开关逻辑
+    private func toggleLaunchAtLogin(enabled: Bool) {
+        do {
+            if enabled { try SMAppService.mainApp.register() }
+            else { try SMAppService.mainApp.unregister() }
+        } catch {
+            print("开机自启动设置失败: \(error)")
+            isLaunchAtLoginEnabled = SMAppService.mainApp.status == .enabled
+        }
     }
 }
 
@@ -265,8 +347,8 @@ struct TaskRowView: View {
 
     private func priorityColor(for priority: TaskPriority) -> Color {
         switch priority {
-        case .low: return .primary.opacity(0.6) // 浅透明度，视觉上最弱
-        case .medium: return .primary.opacity(0.85) // 中等透明度
+        case .low: return .primary.opacity(0.3) // 浅透明度，视觉上最弱
+        case .medium: return .primary.opacity(0.7) // 中等透明度
         case .high: return .primary // 默认文字颜色，最醒目
         }
     }

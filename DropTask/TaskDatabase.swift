@@ -4,6 +4,7 @@ import Foundation
 enum TaskDatabase {
     static let schema = Schema([TaskItem.self])
 
+    @MainActor
     static let sharedContainer: ModelContainer = {
         let modelConfiguration = ModelConfiguration(
             "DropTaskTasks",
