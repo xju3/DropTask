@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import SwiftUI
 
 @Model
 final class TaskItem {
@@ -40,10 +41,14 @@ enum TaskPriority: String, Codable, CaseIterable {
     case low = "低"
     case medium = "中"
     case high = "高"
+    
+    var localizedName: LocalizedStringKey { LocalizedStringKey(rawValue) }
 }
 
 enum TaskStatus: String, Codable, CaseIterable {
     case notStarted = "未开始"
     case inProgress = "进行中"
     case completed = "已完成"
+    
+    var localizedName: LocalizedStringKey { LocalizedStringKey(rawValue) }
 }

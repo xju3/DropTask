@@ -10,11 +10,6 @@ import SwiftData
 import AppIntents
 import Carbon
 
-// 增加通知名以供全局热键触发和应用响应
-extension NSNotification.Name {
-    static let toggleDropTaskMenu = NSNotification.Name("ToggleDropTaskMenu")
-}
-
 // 用于在应用刚启动时直接干掉多余弹出的窗口
 class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -49,9 +44,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // 注册系统级键盘事件回调
         InstallEventHandler(GetApplicationEventTarget(), { (nextHandler, theEvent, userData) -> OSStatus in
-            // 接收到热键后，在主线程抛出通知更新 UI
+            // 接收到热键后，直接在主线程响应，避免视图休眠导致漏接通知
             DispatchQueue.main.async {
-                NotificationCenter.default.post(name: .toggleDropTaskMenu, object: nil)
+                NSApplication.shared.activate(ignoringOtherApps: true)
+                NSSound.beep() // 播放提示音
             }
             return noErr
         }, 1, &eventType, nil, nil)
@@ -73,12 +69,6 @@ struct DropTaskApp: App {
     var body: some Scene {
         MenuBarExtra("DropTask", systemImage: "checklist") {
             ContentView()
-                .onReceive(NotificationCenter.default.publisher(for: .toggleDropTaskMenu)) { _ in
-                    // 苹果原生 SwiftUI (MenuBarExtra) 目前不支持通过代码直接“展开”下拉窗口。
-                    // 快捷键触发时，将应用强制激活至前台，并播放提示音。
-                    NSApplication.shared.activate(ignoringOtherApps: true)
-                    NSSound.beep() // 播放一声系统提示音以作反馈
-                }
         }
         .menuBarExtraStyle(.window)
         .modelContainer(TaskDatabase.sharedContainer)

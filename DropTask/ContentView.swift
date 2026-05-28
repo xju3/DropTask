@@ -24,6 +24,7 @@ struct ContentView: View {
     // 增加过滤状态变量。默认状态选"未完成"以保持您之前的体验（也可手动选"全部"不过滤）
     @State private var selectedStatusFilter: String = "未完成"
     @State private var selectedCategoryFilter: String = "全部"
+    @State private var selectedPriorityFilter: String = "全部"
     
     // 新增：搜索文本和自启动状态
     @State private var searchText: String = ""
@@ -48,10 +49,13 @@ struct ContentView: View {
             // 分类过滤逻辑：全部，或者是具体匹配的分类
             let categoryMatch = selectedCategoryFilter == "全部" || task.category == selectedCategoryFilter
             
+            // 优先级过滤逻辑：全部，或者是具体匹配的优先级
+            let priorityMatch = selectedPriorityFilter == "全部" || task.priority.rawValue == selectedPriorityFilter
+            
             // 搜索过滤逻辑：标题或内容包含搜索词
             let searchMatch = searchText.isEmpty || task.title.localizedCaseInsensitiveContains(searchText) || task.content.localizedCaseInsensitiveContains(searchText)
             
-            return statusMatch && categoryMatch && searchMatch
+            return statusMatch && categoryMatch && priorityMatch && searchMatch
         }
     }
     
@@ -76,7 +80,18 @@ struct ContentView: View {
                         Text("未完成").tag("未完成") 
                         Divider()
                         ForEach(TaskStatus.allCases, id: \.self) { status in
-                            Text(status.rawValue).tag(status.rawValue)
+                        Text(status.localizedName).tag(status.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    
+                    Spacer()
+                    
+                    Picker("优先级", selection: $selectedPriorityFilter) {
+                        Text("所有优先级").tag("全部")
+                        Divider()
+                        ForEach(TaskPriority.allCases, id: \.self) { priority in
+                        Text(priority.localizedName).tag(priority.rawValue)
                         }
                     }
                     .labelsHidden()
@@ -85,7 +100,7 @@ struct ContentView: View {
                     
                     Picker("分类", selection: $selectedCategoryFilter) {
                         ForEach(availableCategories, id: \.self) { cat in
-                            Text(cat == "全部" ? "所有分类" : cat).tag(cat)
+                            Text(cat == "全部" ? String(localized: "所有分类") : cat).tag(cat)
                         }
                     }
                     .labelsHidden()
@@ -231,10 +246,10 @@ struct ContentView: View {
             isPresented: $isExporting,
             document: exportDocument,
             contentType: UTType(filenameExtension: "md") ?? .plainText,
-            defaultFilename: "DropTask任务导出.md"
+            defaultFilename: String(localized: "DropTask任务导出") + ".md"
         ) { result in
             if case .failure(let error) = result {
-                print("导出失败: \(error.localizedDescription)")
+                print("\(String(localized: "导出失败:")) \(error.localizedDescription)")
             }
         }
     }
@@ -242,7 +257,7 @@ struct ContentView: View {
     // 导出功能实现
     private func exportTasks() {
         // 1. 以 Markdown 格式导出
-        var markdownString = "# DropTask 任务导出\n\n"
+        var markdownString = "# \(String(localized: "DropTask 任务导出"))\n\n"
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd HH:mm"
         
@@ -253,15 +268,15 @@ struct ContentView: View {
             markdownString += "\(checkbox) **\(task.title)**\n"
             
             if !task.category.isEmpty {
-                markdownString += "  - **分类:** \(task.category)\n"
+                markdownString += "  - **\(String(localized: "分类")):** \(task.category)\n"
             }
-            markdownString += "  - **优先级:** \(task.priority.rawValue)\n"
-            markdownString += "  - **状态:** \(task.status.rawValue)\n"
-            markdownString += "  - **计划完成:** \(dateFormatter.string(from: task.plannedCompletionTime))\n"
+            markdownString += "  - **\(String(localized: "优先级")):** \(NSLocalizedString(task.priority.rawValue, comment: ""))\n"
+            markdownString += "  - **\(String(localized: "状态")):** \(NSLocalizedString(task.status.rawValue, comment: ""))\n"
+            markdownString += "  - **\(String(localized: "计划完成")):** \(dateFormatter.string(from: task.plannedCompletionTime))\n"
             
             if !task.content.isEmpty {
                 let indentedContent = task.content.replacingOccurrences(of: "\n", with: "\n    ")
-                markdownString += "  - **备注:**\n    > \(indentedContent)\n"
+                markdownString += "  - **\(String(localized: "备注")):**\n    > \(indentedContent)\n"
             }
             markdownString += "\n"
         }
@@ -277,7 +292,7 @@ struct ContentView: View {
             if enabled { try SMAppService.mainApp.register() }
             else { try SMAppService.mainApp.unregister() }
         } catch {
-            print("开机自启动设置失败: \(error)")
+            print("\(String(localized: "开机自启动设置失败:")) \(error)")
             isLaunchAtLoginEnabled = SMAppService.mainApp.status == .enabled
         }
     }
@@ -317,7 +332,7 @@ struct TaskRowView: View {
             Spacer()
             
             VStack(alignment: .trailing, spacing: 6) {
-                Text(task.status.rawValue)
+                Text(task.status.localizedName)
                     .font(.caption)
                     .foregroundColor(.secondary)
                 

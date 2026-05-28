@@ -28,7 +28,7 @@ struct TaskEditorView: View {
 
     var body: some View {
         VStack {
-            Text(editingTaskId == nil ? "新增任务" : "编辑任务")
+            Text(editingTaskId == nil ? String(localized: "新增任务") : String(localized: "编辑任务"))
                 .font(.headline)
                 .padding(.bottom)
 
@@ -65,7 +65,7 @@ struct TaskEditorView: View {
                     Text("重要").foregroundColor(.secondary).frame(width: 35, alignment: .leading)
                     Picker("", selection: $priority) {
                         ForEach(TaskPriority.allCases, id: \.self) { priority in
-                            Text(priority.rawValue).tag(priority)
+                        Text(priority.localizedName).tag(priority)
                         }
                     }
                     .labelsHidden()
@@ -77,7 +77,7 @@ struct TaskEditorView: View {
                     Text("状态").foregroundColor(.secondary).frame(width: 35, alignment: .leading)
                     Picker("", selection: $status) {
                         ForEach(TaskStatus.allCases, id: \.self) { s in
-                            Text(s.rawValue).tag(s)
+                        Text(s.localizedName).tag(s)
                         }
                     }
                     .labelsHidden()

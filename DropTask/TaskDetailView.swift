@@ -47,13 +47,13 @@ struct TaskDetailView: View {
 
                 Picker("重要性", selection: $task.priority) {
                     ForEach(TaskPriority.allCases, id: \.self) { p in
-                        Text(p.rawValue).tag(p)
+                        Text(p.localizedName).tag(p)
                     }
                 }
                 
                 Picker("状态", selection: $task.status) {
                     ForEach(TaskStatus.allCases, id: \.self) { s in
-                        Text(s.rawValue).tag(s)
+                        Text(s.localizedName).tag(s)
                     }
                 }
 
